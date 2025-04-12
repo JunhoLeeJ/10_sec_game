@@ -1,0 +1,8 @@
+data.txt
+encrypted_data.txt
+__pycache__/
+*.pyc
+.env
+.DS_Store
+Thumbs.db
+
