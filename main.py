@@ -4,6 +4,9 @@ import keyring
 import pygame
 from cryptography.fernet import Fernet
 import cryptography
+import time
+import random
+
 
 # 키체인 설정
 SERVICE_NAME = "10_sec_game"
@@ -162,47 +165,147 @@ class sprite:
 
 
 play_images_list = ['play_normal.png', 'play_hover.png', 'play_pressed.png']
-play_sprite = sprite(play_images_list, [-1], 0, False, True,
+play = sprite(play_images_list, [-1], 0, False, True,
                      0.5, 0.5)
 
 menu_images_list = ['menu_normal.png', 'menu_hover.png', 'menu_pressed.png']
-menu_sprite = sprite(menu_images_list, [0, 1, 2, 3, 4], -1, False, True,
+menu = sprite(menu_images_list, [0, 1, 2, 3, 4], -1, False, True,
                      0.2, 0.1)
 
 lvl1_images_list = ['level_1_normal.png', 'level_1_hover.png', 'level_1_pressed.png']
-lvl1_sprite = sprite(lvl1_images_list, [0], 1, False, True,
-                     0.2, 0.3)
+lvl1 = sprite(lvl1_images_list, [0], 1, False, True,
+              0.2, 0.3)
 
 lvl2_images_list = ['level_2_normal.png', 'level_2_hover.png', 'level_2_pressed.png', 'level_2_locked.png']
-lvl2_sprite = sprite(lvl2_images_list, [0], 2, False, False,
-                     0.3, 0.3)
+lvl2 = sprite(lvl2_images_list, [0], 2, False, False,
+              0.3, 0.3)
 
-levels = [lvl1_sprite, lvl2_sprite]
+levels = [lvl1, lvl2]
 
-level = levels[0]   # init value, will change
+
+class archer_sprite:
+    global stage
+
+    def __init__(self, images_list, x, y, hp, cool_time, attack_time, speed, movable):
+        self.normal_image = pygame.image.load(images_list[0])
+        self.image = self.normal_image
+        image_width, image_height = self.normal_image.get_size()
+        self.normal_get_rect = self.image.get_rect(topleft=((screen_width - image_width) * x,
+                                                            (screen_height - image_height) * y))
+        self.start_attack_image = pygame.image.load(images_list[1])
+        self.end_attack_image = pygame.image.load(images_list[2])
+        attack_image_width, attack_image_height = self.end_attack_image.get_size()
+        self.attack_get_rect = self.end_attack_image.get_rect(topleft=((screen_width - attack_image_width) * x,
+                                                            (screen_height - attack_image_height) * y))
+        self.get_rect = self.normal_get_rect
+        self.x = x
+        self.y = y
+        self.hp = hp
+        self.cool_time = cool_time
+        self.attack_time = attack_time
+        self.speed = speed
+        self.movable = movable
+        self.start_attack = 0
+        self.attack_motion_frame = 0
+    def collision_check(self, enemies, direction):      # using direction tilt attack range
+        global stage
+        for enemy in enemies:
+            if self.get_rect.colliderect(enemy.get_rect):
+                self.hp -= 1
+                # add red screen effect - screen.blit(transparent red image)
+                if self.hp <= 0:
+                    stage = 'fail'
+    def win_check(self, enemies):
+        global stage
+        win = True
+        if self.hp <= 0:
+            return False
+        else:
+            for enemy in enemies:
+                if enemy.required and not enemy.removed:
+                    return False
+        if win:
+            return True
+    def attack(self):
+        if time.time() - self.start_attack >= self.cool_time:
+            self.start_attack = time.time()
+            self.attack_motion_frame = 0
+    def attack_motion(self):
+        if self.attack_motion_frame <= self.attack_time / 4:    # first half prepare attack
+            self.image = self.start_attack_image
+            self.get_rect = self.normal_get_rect
+            self.attack_motion_frame += 0.01
+        elif self.attack_motion_frame <= self.attack_time:      # second half actual attack
+            self.image = self.end_attack_image
+            self.get_rect = self.attack_get_rect
+            self.attack_motion_frame += 0.01
+        else:
+            self.image = self.normal_image
+            self.get_rect = self.normal_get_rect
+
+
+
+class sword_sprite(archer_sprite):     # 일단 sword sprite 만들고 나중에 겹치는 부분만 남기기
+    global stage
+    def __init__(self, images_list, x, y, hp, cool_time, attack_time, speed, movable, attacking):
+        super().__init__(images_list, x, y, hp, cool_time, attack_time, speed, movable)
+        self.attacking = attacking
+        self.attack_time = attack_time
+    def collision_check(self, enemies, direction):      # using direction tilt attack range
+        global stage
+        time_from_attack = time.time() - self.start_attack
+        if time_from_attack > self.attack_time or time_from_attack <= self.attack_time / 2:
+            # attacking or not
+            self.attacking = False
+        else:
+            self.attacking = True
+        for enemy in enemies:
+            if self.get_rect.colliderect(enemy.get_rect):
+                self.hp -= 1
+                # add red screen effect - screen.blit(transparent red image)
+                if self.hp <= 0:
+                    stage = 'fail'
+            elif self.attack_get_rect.colliderect(enemy.get_rect) and self.attacking:
+                enemy.hp -= 1
+                if enemy.hp <= 0:
+                    enemy.remove()
+
+
+
+archer_images_list = ['archer_normal.png', 'archer_start_attack.png', 'archer_end_attack.png']
+archer = archer_sprite(archer_images_list, 0.3, 0.5, 2, 3, 0.3, 10, True)
+sword_images_list = ['sword_normal.png', 'sword_start_attack.png', 'sword_end_attack.png']
+# 모션 보면 중간 맞추려는 거 때문에 굉장히 어색함. 수정 필요. 타격 판정을 겸하니까 어떻게 잘 해야 함
+sword = sword_sprite(sword_images_list, 0.7, 0.5, 2, 1.5, 0.3, 10, True, False)
+
 
 
 # def main():
 # 만약 안되면 이거랑 마지막 주석 취소하고 싹 다 탭으로 밀기
 
 
-
 test_variable = 0
 # 게임 루프
 running = True
 while running:
+    archer.attack_motion()
+    sword.attack_motion()
+
     # Events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            play_sprite.check_image_click(event.pos)
-            menu_sprite.check_image_click(event.pos)
+            play.check_image_click(event.pos)
+            menu.check_image_click(event.pos)
             for level in levels:
                 level.check_image_click(event.pos)
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            play_sprite.check_image_release(event.pos)
-            menu_sprite.check_image_release(event.pos)
+            if stage != -1 and stage != 0:
+                archer.attack()
+                sword.attack()
+            play.check_image_release(event.pos)
+            menu.check_image_release(event.pos)
             for level in levels:
                 level.check_image_release(event.pos)
 
@@ -215,7 +318,7 @@ while running:
         screen.fill(white)
         write_text('10 Seconds Game!', 36, black, 0.5, 0.1)
         write_text(f'Stage: {stage}', 36, black, 0.5, 0.8)
-        screen.blit(play_sprite.change_image_stat(), play_sprite.get_rect)
+        screen.blit(play.change_image_stat(), play.get_rect)
         
     elif stage == 0:
         screen.fill(white)
@@ -225,13 +328,15 @@ while running:
 
     elif stage == 1:
         screen.fill(white)
-        screen.blit(menu_sprite.change_image_stat(), menu_sprite.get_rect)
-        lvl2_sprite.unlocked = True
+        screen.blit(menu.change_image_stat(), menu.get_rect)
+        screen.blit(sword.image, sword.get_rect)
+        screen.blit(archer.image, archer.get_rect)
+        lvl2.unlocked = True
         write_text('level 1', 36, black, 0.5, 0.1)
 
     elif stage == 2:
         screen.fill(white)
-        screen.blit(menu_sprite.change_image_stat(), menu_sprite.get_rect)
+        screen.blit(menu.change_image_stat(), menu.get_rect)
         write_text('level 2', 36, black, 0.5, 0.1)
 
 
