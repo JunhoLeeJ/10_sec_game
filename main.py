@@ -120,46 +120,65 @@ def write_text(text, size, color, x, y):
     screen.blit(given_text, ((screen_width - text_width) * x,
                              (screen_height - text_height) * y))
 
-# 이미지 설정
-def image_get_rect(image, x, y):
-    image_width, image_height = image.get_size()
-    return image.get_rect(topleft=((screen_width - image_width) * x,
-                                   (screen_height - image_height) * y))
 
-def click_check_image(button_pressed, images_list):
+class sprite:
     global mouse_pos
     global mouse_pressed
-    if mouse_pressed and button_pressed and images_list[3].collidepoint(mouse_pos):
-        return images_list[2]
-    elif images_list[3].collidepoint(mouse_pos):
-        return images_list[1]
-    else:
-        return images_list[0]
+    global stage
+    def __init__(self, images_list, stages, stage_dest, pressed, unlocked, x, y):
+        self.normal_image = pygame.image.load(images_list[0])
+        self.hover_image = pygame.image.load(images_list[1])
+        self.pressed_image = pygame.image.load(images_list[2])
+        self.images_list = images_list
+        image_width, image_height = self.normal_image.get_size()
+        self.get_rect = self.normal_image.get_rect(topleft=((screen_width - image_width) * x,
+                                                            (screen_height - image_height) * y))
+        self.stage_number = stages
+        self.stage_dest = stage_dest
+        self.pressed = pressed
+        self.unlocked = unlocked
 
-knight_image = pygame.image.load("sword.png")
-sword_image = pygame.image.load("sword.png")
-archer_image = pygame.image.load("sword.png")
-bow_image = pygame.image.load("sword.png")
-arrow_image = pygame.image.load("sword.png")
-enemy_image = pygame.image.load("sword.png")
-bullet_image = pygame.image.load("sword.png")
+    def change_image_stat(self):
+        if self.get_rect.collidepoint(mouse_pos) and self.unlocked:
+            if self.pressed:
+                return self.pressed_image
+            else:
+                return self.hover_image
+        elif not self.unlocked:
+            return pygame.image.load(self.images_list[3])
+        else:
+            return self.normal_image
 
-play_normal_image = pygame.image.load('play_normal.png')
-play_hover_image = pygame.image.load('play_hover.png')
-play_pressed_image = pygame.image.load('play_pressed.png')
-play_get_rect = image_get_rect(play_normal_image, 0.5, 0.5)
-play_images_list = [play_normal_image, play_hover_image, play_pressed_image, 
-                    play_get_rect, 0, False, False]
-# 0: normal, 1: hover, 2: pressed, 3: rect, 4: stage number. 4~6: ignore
+    def check_image_click(self, click_pos):
+        if stage in self.stage_number:
+            if self.get_rect.collidepoint(click_pos):
+                self.pressed = True
 
-lvl0_normal_image = pygame.image.load('level_0_image.png')
-lvl0_hover_image = pygame.image.load('level_0_image.png')
-lvl0_pressed_image = pygame.image.load('level_0_image.png')
-lvl0_get_rect = image_get_rect(lvl0_normal_image, 0.1, 0.3)
-lvl0_images_list = [lvl0_normal_image, lvl0_hover_image, lvl0_pressed_image, lvl0_get_rect, 0, False, False]
-# 0: normal, 1: hover, 2: pressed, 3: rect, 4: level number, 5: button pressed, 6: locked
+    def check_image_release(self, release_pos):
+        global stage
+        if stage in self.stage_number and self.get_rect.collidepoint(release_pos) and self.unlocked and self.pressed:
+            stage = self.stage_dest
+        self.pressed = False
 
-levels = [lvl0_images_list]
+
+play_images_list = ['play_normal.png', 'play_hover.png', 'play_pressed.png']
+play_sprite = sprite(play_images_list, [-1], 0, False, True,
+                     0.5, 0.5)
+
+menu_images_list = ['menu_normal.png', 'menu_hover.png', 'menu_pressed.png']
+menu_sprite = sprite(menu_images_list, [0, 1, 2, 3, 4], -1, False, True,
+                     0.2, 0.1)
+
+lvl1_images_list = ['level_1_normal.png', 'level_1_hover.png', 'level_1_pressed.png']
+lvl1_sprite = sprite(lvl1_images_list, [0], 1, False, True,
+                     0.2, 0.3)
+
+lvl2_images_list = ['level_2_normal.png', 'level_2_hover.png', 'level_2_pressed.png', 'level_2_locked.png']
+lvl2_sprite = sprite(lvl2_images_list, [0], 2, False, False,
+                     0.3, 0.3)
+
+levels = [lvl1_sprite, lvl2_sprite]
+
 level = levels[0]   # init value, will change
 
 
@@ -169,7 +188,6 @@ level = levels[0]   # init value, will change
 
 
 test_variable = 0
-playing = False
 # 게임 루프
 running = True
 while running:
@@ -178,45 +196,44 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if stage == -2:
-                if play_images_list[3].collidepoint(event.pos):
-                    play_button_pressed = True
-            elif stage == -1:
-                for level in levels:
-                    if level[3].collidepoint(event.pos):
-                        level[5] = True     # button pressed
-                        break
+            play_sprite.check_image_click(event.pos)
+            menu_sprite.check_image_click(event.pos)
+            for level in levels:
+                level.check_image_click(event.pos)
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            if stage == -2:
-                if play_button_pressed and play_images_list[3].collidepoint(event.pos):
-                    stage = -1
-                    write_data()
-            elif stage == -1:
-                if level[5] and level[3].collidepoint(event.pos):
-                    stage = level[4]
-            play_button_pressed = False  # button press init
-            level[5] = False
+            play_sprite.check_image_release(event.pos)
+            menu_sprite.check_image_release(event.pos)
+            for level in levels:
+                level.check_image_release(event.pos)
 
     mouse_pos = pygame.mouse.get_pos()
     mouse_pressed = pygame.mouse.get_pressed()[0]   # should be True if pressed and False if not
 
 
     # things you have to do in each stage
-    if stage == -2:
-        current_play_image = click_check_image(play_button_pressed, play_images_list)
+    if stage == -1:
         screen.fill(white)
         write_text('10 Seconds Game!', 36, black, 0.5, 0.1)
         write_text(f'Stage: {stage}', 36, black, 0.5, 0.8)
-        screen.blit(current_play_image, play_images_list[3])
+        screen.blit(play_sprite.change_image_stat(), play_sprite.get_rect)
         
-    elif stage == -1:
+    elif stage == 0:
         screen.fill(white)
         write_text('10 Seconds Game!', 36, black, 0.5, 0.1)
         for lvl in levels:
-            screen.blit(lvl[0], lvl[3])
+            screen.blit(lvl.change_image_stat(), lvl.get_rect)
 
-    elif stage == 0:
-        screen.fill(black)
+    elif stage == 1:
+        screen.fill(white)
+        screen.blit(menu_sprite.change_image_stat(), menu_sprite.get_rect)
+        lvl2_sprite.unlocked = True
+        write_text('level 1', 36, black, 0.5, 0.1)
+
+    elif stage == 2:
+        screen.fill(white)
+        screen.blit(menu_sprite.change_image_stat(), menu_sprite.get_rect)
+        write_text('level 2', 36, black, 0.5, 0.1)
+
 
 
     # 화면 업데이트
